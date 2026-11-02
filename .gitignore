@@ -1,0 +1,61 @@
+# Environment files and private credentials
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+
+# Python dependencies, bytecode, and tooling caches
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+.Python
+*.egg-info/
+*.egg
+.eggs/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# Build output, test reports, and logs
+*.log
+
+# Local database data and backups
+/db/data/
+/db/backups/
+
+# VS Code local state; allow shared project configuration
+**/.vscode/*
+!**/.vscode/settings.json
+!**/.vscode/extensions.json
+!**/.vscode/tasks.json
+!**/.vscode/launch.json
+!**/.vscode/*.code-snippets
+.history/
+.idea/
+
+# macOS, Windows, and Linux filesystem and editor artifacts
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.directory
+.Trash-*/
+*~
+*.swp
+*.swo
