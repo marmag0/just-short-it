@@ -31,8 +31,8 @@ coverage.xml
 *.log
 
 # Local database data and backups
-/db/data/
-/db/backups/
+/services/db/data/
+/services/db/backups/
 
 # VS Code local state; allow shared project configuration
 **/.vscode/*

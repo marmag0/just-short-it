@@ -24,15 +24,15 @@
 
 - **Core philosophy**: Simplicity and readability. Every line, comment, and configuration entry must have a clear purpose. Avoid boilerplate, speculative features, or redundant helpers.
 - **Dashes**: Always use classic ASCII dashes (`-`) rather than em dashes or en dashes.
-- **Go** (`services/*/app/`, `cli/`): Format with `gofmt` and lint with `go vet`. Prefer the standard library and do not add linters or dependencies without a clear need.
+- **Go** (`services/*/cmd/`, `cli/`): Format with `gofmt` and lint with `go vet`. Prefer the standard library and do not add linters or dependencies without a clear need.
 - **Whitespace and line breaks**:
   - Use blank lines purposefully to separate logical units, not randomly.
-  - SQL migrations (`db/*/migrations/`):
+  - SQL migrations (`services/db/*/migrations/`):
     - File naming follows a two-digit prefix and camelCase name (e.g. `01_createUrlsTable.sql`, `02_addTelemetryEvents.sql`).
     - Add a blank line immediately after `-- migrate:up` and `-- migrate:down`.
     - Group distinct logical blocks with a single blank line (e.g. between `DO $$ ... $$;` blocks, `GRANT` statements, and `ALTER DEFAULT PRIVILEGES`).
     - Separate the end of the `migrate:up` section from the `-- migrate:down` header with two blank lines.
-  - Shell scripts (`db/postgres/init/`):
+  - Shell scripts (`services/db/postgres/init/`):
     - Use POSIX shell (`#!/bin/sh`) with `set -e`.
     - Place a single blank line after the shebang and after `set -e`.
     - Keep scripts concise, minimal, and idiomatic without wrapper bloat.
@@ -53,17 +53,17 @@
 ## Architecture and repository layout
 
 - `services/` contains application microservices. Each service is structured as:
-  - `services/<service>/app/`: Go module (`go.mod`) with the application source code, configuration, and automated tests.
+  - `services/<service>/cmd/`: Go module (`go.mod`) with the application source code, configuration, and automated tests.
   - `services/<service>/deploy/`: Service containerization assets (`Dockerfile`) and deployment manifests.
 - Initial services:
   - `services/shortener/`: Go service handling high-performance temporary redirection (`307`/`302`) and the link management API, on separate listeners. Checks Redis cache before querying PostgreSQL. Pushes click events to a Redis Stream without blocking the redirect.
   - `services/telemetry/`: Go worker that reads click events from the Redis Stream, enriches them (User-Agent parsing, bot detection), and batch-inserts them into ClickHouse.
-  - Extension point: Future microservices will live under `services/<service_name>/` following the same `app/` and `deploy/` convention.
+  - Extension point: Future microservices will live under `services/<service_name>/` following the same `cmd/` and `deploy/` convention.
 - `cli/`: Go module with the link management CLI (create, list, edit, and disable links, generate QR codes). Talks to the management API with a per-person API key.
-- `db/`: Centralized database directory at repository root:
-  - `db/postgres/init/`: Container bootstrap scripts (e.g. application user creation).
-  - `db/postgres/migrations/`: `dbmate` SQL migrations for links and API keys.
-  - `db/clickhouse/migrations/`: `dbmate` SQL migrations for click events.
+- `services/db/`: Centralized database directory. It is not a Go service and does not follow the `cmd/` and `deploy/` convention:
+  - `services/db/postgres/init/`: Container bootstrap scripts (e.g. application user creation).
+  - `services/db/postgres/migrations/`: `dbmate` SQL migrations for links and API keys.
+  - `services/db/clickhouse/migrations/`: `dbmate` SQL migrations for click events.
   - Schema snapshot generation is disabled (no `schema.sql`).
 - `grafana/`: Grafana provisioning (ClickHouse datasource and dashboards).
 - `.agents/skills/`: Agent skills shared by Codex and Claude Code, one directory per skill (`<skill>/SKILL.md`):
@@ -90,8 +90,8 @@
 - Run `git diff --check` after changes and inspect changed and newly created files for unintended edits.
 - For documentation changes, check grammar, Markdown structure, and affected links or table-of-contents anchors.
 - For ignore-rule changes, check representative ignored and tracked paths with `git check-ignore`.
-- For Go changes, run `gofmt -l .`, `go vet ./...`, and `go test ./...` from the module directory (`services/<service>/app` or `cli`). `gofmt -l` must print nothing. Apply fixes with `gofmt -w .`.
-- For shell script changes in `db/postgres/init/`, run `sh -n db/postgres/init/*.sh`.
+- For Go changes, run `gofmt -l .`, `go vet ./...`, and `go test ./...` from the module directory (`services/<service>/cmd` or `cli`). `gofmt -l` must print nothing. Apply fixes with `gofmt -w .`.
+- For shell script changes in `services/db/postgres/init/`, run `sh -n services/db/postgres/init/*.sh`.
 - For code or Docker changes, run the relevant configured formatting, build, test, and configuration checks across affected services. Add or update regression tests when behavior changes warrant them.
 
 ## Secrets and local files
