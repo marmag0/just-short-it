@@ -2,8 +2,9 @@
 
 ## Project overview
 
-- Project brief: a high-efficiency link shortener monorepo with no frontend, focused on telemetry and data gathering. Short links use custom user-defined suffixes (e.g. `/{custom_suffix}`) and temporary HTTP redirects (`307`/`302`) to ensure all clicks trigger telemetry collection. `[complete here: telemetry data points, metrics schema, and storage destination when chosen]`
-- Planned stack: Python with FastAPI for the backend services, PostgreSQL for persistent data, Redis for in-memory URL caching, Grafana for metrics visualization, dbmate for database migrations, and Docker with Docker Compose for orchestration.
+- Project brief: a high-efficiency link shortener monorepo with no frontend, focused on telemetry and data gathering. Links are managed from a CLI over an HTTP API. Short links use custom user-defined suffixes (e.g. `/{custom_suffix}`) and temporary HTTP redirects (`307`/`302`) to ensure all clicks trigger telemetry collection. Telemetry is passive (request headers, Cloudflare geolocation headers, and Client Hints, no JavaScript) and stored in ClickHouse. `[complete here: final telemetry data points and ClickHouse schema]`
+- Privacy: client IP addresses are never stored or logged raw. `shortener` replaces them with a keyed hash (HMAC-SHA256) before a click event leaves the process.
+- Planned stack: Go for the backend services and the CLI, PostgreSQL for links and API keys, Redis for URL caching and buffering click events (Redis Streams), ClickHouse for click analytics, Grafana for visualization, dbmate for database migrations, Cloudflare with a `cloudflared` tunnel in front, and Docker with Docker Compose for orchestration on a single VPS.
 - Development environment: VS Code on macOS, Windows, and Linux. `.gitignore` should cover generated artifacts from the stack and development environments, as well as local secret files.
 
 ## Working rules
@@ -23,15 +24,15 @@
 
 - **Core philosophy**: Simplicity and readability. Every line, comment, and configuration entry must have a clear purpose. Avoid boilerplate, speculative features, or redundant helpers.
 - **Dashes**: Always use classic ASCII dashes (`-`) rather than em dashes or en dashes.
-- **Python** (`services/*/app/`): Format and lint with Ruff using its default configuration. Do not add custom Ruff rules without a clear need.
+- **Go** (`services/*/app/`, `cli/`): Format with `gofmt` and lint with `go vet`. Prefer the standard library and do not add linters or dependencies without a clear need.
 - **Whitespace and line breaks**:
   - Use blank lines purposefully to separate logical units, not randomly.
-  - SQL migrations (`db/migrations/`):
+  - SQL migrations (`db/*/migrations/`):
     - File naming follows a two-digit prefix and camelCase name (e.g. `01_createUrlsTable.sql`, `02_addTelemetryEvents.sql`).
     - Add a blank line immediately after `-- migrate:up` and `-- migrate:down`.
     - Group distinct logical blocks with a single blank line (e.g. between `DO $$ ... $$;` blocks, `GRANT` statements, and `ALTER DEFAULT PRIVILEGES`).
     - Separate the end of the `migrate:up` section from the `-- migrate:down` header with two blank lines.
-  - Shell scripts (`db/init/`):
+  - Shell scripts (`db/postgres/init/`):
     - Use POSIX shell (`#!/bin/sh`) with `set -e`.
     - Place a single blank line after the shebang and after `set -e`.
     - Keep scripts concise, minimal, and idiomatic without wrapper bloat.
@@ -52,19 +53,32 @@
 ## Architecture and repository layout
 
 - `services/` contains application microservices. Each service is structured as:
-  - `services/<service>/app/`: Application source code, configuration, dependency management (managed with uv), and automated tests.
+  - `services/<service>/app/`: Go module (`go.mod`) with the application source code, configuration, and automated tests.
   - `services/<service>/deploy/`: Service containerization assets (`Dockerfile`) and deployment manifests.
 - Initial services:
-  - `services/shortener/`: Python FastAPI service handling link management and high-performance temporary redirection (`307`/`302`). Checks Redis cache before querying PostgreSQL.
-  - Extension point: Future microservices (such as a dedicated telemetry ingestion worker or stream processor) will live under `services/<service_name>/` following the same `app/` and `deploy/` convention.
-- `db/`: Centralized PostgreSQL database directory at repository root:
-  - `db/init/`: Container bootstrap scripts (e.g. application user creation).
-  - `db/migrations/`: `dbmate` SQL migrations. Schema snapshot generation is disabled (no `db/schema.sql`).
+  - `services/shortener/`: Go service handling high-performance temporary redirection (`307`/`302`) and the link management API, on separate listeners. Checks Redis cache before querying PostgreSQL. Pushes click events to a Redis Stream without blocking the redirect.
+  - `services/telemetry/`: Go worker that reads click events from the Redis Stream, enriches them (User-Agent parsing, bot detection), and batch-inserts them into ClickHouse.
+  - Extension point: Future microservices will live under `services/<service_name>/` following the same `app/` and `deploy/` convention.
+- `cli/`: Go module with the link management CLI (create, list, edit, and disable links, generate QR codes). Talks to the management API with a per-person API key.
+- `db/`: Centralized database directory at repository root:
+  - `db/postgres/init/`: Container bootstrap scripts (e.g. application user creation).
+  - `db/postgres/migrations/`: `dbmate` SQL migrations for links and API keys.
+  - `db/clickhouse/migrations/`: `dbmate` SQL migrations for click events.
+  - Schema snapshot generation is disabled (no `schema.sql`).
+- `grafana/`: Grafana provisioning (ClickHouse datasource and dashboards).
+- `.agents/skills/`: Agent skills shared by Codex and Claude Code, one directory per skill (`<skill>/SKILL.md`):
+  - Codex reads `.agents/skills/` directly. This is the only place to edit skills.
+  - Claude Code reads `.claude/skills/`, where each `<skill>` is a relative symlink to `.agents/skills/<skill>/`. Add a matching symlink for every new skill.
+  - On Windows, the symlinks require `core.symlinks=true` in Git.
 - `docker-compose.yml`: Top-level multi-service orchestration defining:
+  - `cloudflared`: Cloudflare tunnel, the only way in from the internet (no published ports).
   - `db`: PostgreSQL database.
-  - `db-migrator`: `dbmate` one-shot migration runner.
-  - `redis`: In-memory cache for fast URL redirection.
-  - `shortener`: FastAPI link shortener and redirect service (`services/shortener/deploy/Dockerfile`).
+  - `db-migrator`: `dbmate` one-shot migration runner for PostgreSQL.
+  - `clickhouse`: ClickHouse database for click events.
+  - `clickhouse-migrator`: `dbmate` one-shot migration runner for ClickHouse.
+  - `redis`: In-memory cache for fast URL redirection and buffer for click events.
+  - `shortener`: Link shortener and redirect service (`services/shortener/deploy/Dockerfile`).
+  - `telemetry`: Click event ingestion worker (`services/telemetry/deploy/Dockerfile`).
   - `grafana`: Metrics and telemetry visualization dashboards.
   - Extension point: Additional telemetry sinks or services.
 - `Makefile`: Monorepo task shorthand (`make dev`, `make prod`, `make down`, `make test`, `make lint`, `make format`, `make help`).
@@ -76,8 +90,8 @@
 - Run `git diff --check` after changes and inspect changed and newly created files for unintended edits.
 - For documentation changes, check grammar, Markdown structure, and affected links or table-of-contents anchors.
 - For ignore-rule changes, check representative ignored and tracked paths with `git check-ignore`.
-- For Python changes in any service, run `uv run --directory services/<service>/app ruff check`, `uv run --directory services/<service>/app ruff format --check`, and `uv run --directory services/<service>/app pytest`. Apply fixes with `ruff check --fix` and `ruff format`.
-- For shell script changes in `db/init/`, run `sh -n db/init/*.sh`.
+- For Go changes, run `gofmt -l .`, `go vet ./...`, and `go test ./...` from the module directory (`services/<service>/app` or `cli`). `gofmt -l` must print nothing. Apply fixes with `gofmt -w .`.
+- For shell script changes in `db/postgres/init/`, run `sh -n db/postgres/init/*.sh`.
 - For code or Docker changes, run the relevant configured formatting, build, test, and configuration checks across affected services. Add or update regression tests when behavior changes warrant them.
 
 ## Secrets and local files
