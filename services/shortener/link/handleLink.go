@@ -1,4 +1,4 @@
-package main
+package link
 
 import (
 	"log/slog"
@@ -6,19 +6,19 @@ import (
 )
 
 type Server struct {
-	base  string
-	links map[string]string
+	Base  string
+	Links map[string]string
 	// further args in future
 }
 
-func (s *Server) handleLink(w http.ResponseWriter, r *http.Request) {
+func (s *Server) HandleLink(w http.ResponseWriter, r *http.Request) {
 	link := r.PathValue("link")
-	fullLink := s.base + "/" + link
+	fullLink := s.Base + "/" + link
 
 	slog.Info("received short link request", "link", fullLink)
 
 	// 1. Initial short link format validation
-	ok, msg := initialLinkValid(link)
+	ok, msg := InitialLinkValid(link)
 	if !ok {
 		slog.Error("short link not allowed", "link", fullLink, "msg", msg)
 		http.NotFound(w, r)
@@ -26,7 +26,7 @@ func (s *Server) handleLink(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// DEMO: checking if short link exists (in mock database)
-	var target string = s.links[link]
+	var target string = s.Links[link]
 	if target == "" {
 		slog.Error("short link doesn't exist", "link", fullLink)
 		http.NotFound(w, r)

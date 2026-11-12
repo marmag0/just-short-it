@@ -1,6 +1,6 @@
-package main
+package link
 
-func initialLinkValid(link string) (bool, string) {
+func InitialLinkValid(link string) (bool, string) {
 	if len(link) < 3 {
 		return false, "short link's length is too short, min length is 3"
 	} else if len(link) > 32 {

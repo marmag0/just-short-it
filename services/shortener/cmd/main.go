@@ -10,6 +10,8 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/marmag0/just-short-it/services/shortener/link"
 )
 
 func main() {
@@ -17,13 +19,13 @@ func main() {
 	base := "cyberwav.ee"
 	addr := fmt.Sprintf("localhost:%d", port)
 
-	srv := &Server{
-		base:  base,
-		links: map[string]string{"test": "https://akamai.com"},
+	srv := &link.Server{
+		Base:  base,
+		Links: map[string]string{"test": "https://akamai.com"},
 	}
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /{link}", srv.handleLink)
+	mux.HandleFunc("GET /{link}", srv.HandleLink)
 
 	httpServer := &http.Server{
 		Addr:    addr,

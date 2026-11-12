@@ -24,7 +24,7 @@
 
 - **Core philosophy**: Simplicity and readability. Every line, comment, and configuration entry must have a clear purpose. Avoid boilerplate, speculative features, or redundant helpers.
 - **Dashes**: Always use classic ASCII dashes (`-`) rather than em dashes or en dashes.
-- **Go** (`services/*/cmd/`, `cli/`): Format with `gofmt` and lint with `go vet`. Prefer the standard library and do not add linters or dependencies without a clear need.
+- **Go** (`services/`, `cli/`, `tests/`): Format with `gofmt` and lint with `go vet`. Prefer the standard library and do not add linters or dependencies without a clear need.
 - **Whitespace and line breaks**:
   - Use blank lines purposefully to separate logical units, not randomly.
   - SQL migrations (`services/db/*/migrations/`):
@@ -53,19 +53,24 @@
 ## Architecture and repository layout
 
 - `services/` contains application microservices. Each service is structured as:
-  - `services/<service>/cmd/`: Go module (`go.mod`) with the application source code, configuration, and automated tests.
+  - `services/<service>/cmd/`: `main` package that configures and starts the service.
+  - `services/<service>/<package>/`: Go packages with the service logic (e.g. `services/shortener/link/`).
   - `services/<service>/deploy/`: Service containerization assets (`Dockerfile`) and deployment manifests.
 - Initial services:
   - `services/shortener/`: Go service handling high-performance temporary redirection (`307`/`302`) and the link management API, on separate listeners. Checks Redis cache before querying PostgreSQL. Pushes click events to a Redis Stream without blocking the redirect.
   - `services/telemetry/`: Go worker that reads click events from the Redis Stream, enriches them (User-Agent parsing, bot detection), and batch-inserts them into ClickHouse.
   - Extension point: Future microservices will live under `services/<service_name>/` following the same `cmd/` and `deploy/` convention.
-- `cli/`: Go module with the link management CLI (create, list, edit, and disable links, generate QR codes). Talks to the management API with a per-person API key.
+- `cli/`: Go link management CLI (create, list, edit, and disable links, generate QR codes). Talks to the management API with a per-person API key.
 - `services/db/`: Centralized database directory. It is not a Go service and does not follow the `cmd/` and `deploy/` convention:
   - `services/db/postgres/init/`: Container bootstrap scripts (e.g. application user creation).
   - `services/db/postgres/migrations/`: `dbmate` SQL migrations for links and API keys.
   - `services/db/clickhouse/migrations/`: `dbmate` SQL migrations for click events.
   - Schema snapshot generation is disabled (no `schema.sql`).
 - `grafana/`: Grafana provisioning (ClickHouse datasource and dashboards).
+- `tests/`: All automated tests, grouped by service:
+  - `tests/<service>/<package>/`: Unit tests of `services/<service>/<package>/` in the external test package `<package>_test`.
+  - `tests/<service>/e2e/`: End-to-end tests that build the service binary, run it, and send it HTTP requests.
+  - Tests reach only exported names of non-`main` packages, so testable logic lives outside `cmd/`.
 - `.agents/skills/`: Agent skills shared by Codex and Claude Code, one directory per skill (`<skill>/SKILL.md`):
   - Codex reads `.agents/skills/` directly. This is the only place to edit skills.
   - Claude Code reads `.claude/skills/`, where each `<skill>` is a relative symlink to `.agents/skills/<skill>/`. Add a matching symlink for every new skill.
@@ -81,6 +86,7 @@
   - `telemetry`: Click event ingestion worker (`services/telemetry/deploy/Dockerfile`).
   - `grafana`: Metrics and telemetry visualization dashboards.
   - Extension point: Additional telemetry sinks or services.
+- `go.mod`: The only Go module (`github.com/marmag0/just-short-it`), shared by all services, the CLI, and the tests.
 - `Makefile`: Monorepo task shorthand (`make dev`, `make prod`, `make down`, `make test`, `make lint`, `make format`, `make help`).
 - `.env`: Local environment values (ignored by Git). `.env.example`: Tracked template with variable placeholders.
 - `README.md`: Top-level project documentation.
@@ -90,9 +96,9 @@
 - Run `git diff --check` after changes and inspect changed and newly created files for unintended edits.
 - For documentation changes, check grammar, Markdown structure, and affected links or table-of-contents anchors.
 - For ignore-rule changes, check representative ignored and tracked paths with `git check-ignore`.
-- For Go changes, run `gofmt -l .`, `go vet ./...`, and `go test ./...` from the module directory (`services/<service>/cmd` or `cli`). `gofmt -l` must print nothing. Apply fixes with `gofmt -w .`.
+- For Go changes, run `gofmt -l .`, `go vet ./...`, and `go test ./...` from the repository root. `gofmt -l` must print nothing. Apply fixes with `gofmt -w .`.
 - For shell script changes in `services/db/postgres/init/`, run `sh -n services/db/postgres/init/*.sh`.
-- For code or Docker changes, run the relevant configured formatting, build, test, and configuration checks across affected services. Add or update regression tests when behavior changes warrant them.
+- For code or Docker changes, run the relevant configured formatting, build, test, and configuration checks across affected services. Add or update regression tests in `tests/` when behavior changes warrant them.
 
 ## Secrets and local files
 
