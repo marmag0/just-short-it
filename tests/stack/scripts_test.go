@@ -9,9 +9,9 @@ import (
 	"testing"
 )
 
-// prerequisites runs scripts/prerequisites.sh in a copy of the repository files it reads, with env as .env.
+// script runs scripts/name in a copy of the repository files the scripts read, with env as .env.
 // A nil env leaves .env out. It returns the output and the exit code.
-func prerequisites(t *testing.T, env map[string]string, args ...string) (string, int) {
+func script(t *testing.T, name string, env map[string]string, args ...string) (string, int) {
 	t.Helper()
 
 	dir := t.TempDir()
@@ -37,7 +37,10 @@ func prerequisites(t *testing.T, env map[string]string, args ...string) (string,
 		}
 	}
 
-	out, err := exec.Command("sh", append([]string{filepath.Join(dir, "scripts", "prerequisites.sh")}, args...)...).CombinedOutput()
+	cmd := exec.Command("sh", append([]string{filepath.Join(dir, "scripts", name)}, args...)...)
+	// The copy must never act on the containers of the real stack.
+	cmd.Env = append(os.Environ(), "COMPOSE_PROJECT_NAME=just-short-it-test-scripts")
+	out, err := cmd.CombinedOutput()
 	var exitErr *exec.ExitError
 	if errors.As(err, &exitErr) {
 		return string(out), exitErr.ExitCode()
@@ -57,9 +60,9 @@ func TestMakeFlags(t *testing.T) {
 		args []string
 		want string
 	}{
-		{[]string{"down"}, "docker compose --profile tunnel down"},
-		{[]string{"down", "VOLUME=1"}, "docker compose --profile tunnel down --volumes"},
-		{[]string{"down", "VOLUME=0"}, "docker compose --profile tunnel down"},
+		{[]string{"down"}, "scripts/down.sh"},
+		{[]string{"down", "VOLUME=1"}, "scripts/down.sh --volumes"},
+		{[]string{"down", "VOLUME=0"}, "scripts/down.sh"},
 		{[]string{"status"}, "scripts/status.sh"},
 		{[]string{"status", "TUNNEL=1"}, "scripts/status.sh --tunnel"},
 		{[]string{"update"}, "scripts/update.sh"},
@@ -116,7 +119,7 @@ func TestPrerequisites(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			out, code := prerequisites(t, tt.env, tt.args...)
+			out, code := script(t, "prerequisites.sh", tt.env, tt.args...)
 			if code != tt.code {
 				t.Errorf("exit code = %d, want %d", code, tt.code)
 			}
@@ -137,8 +140,22 @@ func TestPrerequisites(t *testing.T) {
 	}
 
 	t.Run("unknown flag", func(t *testing.T) {
-		if out, code := prerequisites(t, filled(nil), "--tunel"); code != 2 || !strings.Contains(out, "usage:") {
+		if out, code := script(t, "prerequisites.sh", filled(nil), "--tunel"); code != 2 || !strings.Contains(out, "usage:") {
 			t.Errorf("exit code = %d, output = %q, want 2 and the usage", code, out)
 		}
 	})
+}
+
+func TestDown(t *testing.T) {
+	requireDocker(t)
+
+	for _, args := range [][]string{nil, {"--volumes"}} {
+		out, code := script(t, "down.sh", exampleEnv(t), args...)
+		if code != 0 || !strings.Contains(out, "\033[32m[+] shutdown successful") {
+			t.Errorf("down.sh %v: exit code = %d, output = %q, want 0 and a green summary", args, code, out)
+		}
+	}
+	if out, code := script(t, "down.sh", exampleEnv(t), "--volume"); code != 2 || !strings.Contains(out, "usage:") {
+		t.Errorf("exit code = %d, output = %q, want 2 and the usage", code, out)
+	}
 }

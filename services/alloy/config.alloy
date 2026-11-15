@@ -1,3 +1,4 @@
+// ----- LOKI -----
 discovery.docker "containers" {
   host = "unix:///var/run/docker.sock"
   filter {
@@ -6,7 +7,7 @@ discovery.docker "containers" {
   }
 }
 
-discovery.relabel "logs" {
+discovery.relabel "containers" {
   targets = discovery.docker.containers.targets
 
   rule {
@@ -22,16 +23,17 @@ discovery.relabel "logs" {
 
 loki.source.docker "containers" {
   host       = "unix:///var/run/docker.sock"
-  targets    = discovery.relabel.logs.output
-  forward_to = [loki.write.local.receiver]
+  targets    = discovery.relabel.containers.output
+  forward_to = [loki.write.loki.receiver]
 }
 
-loki.write "local" {
+loki.write "loki" {
   endpoint {
     url = "http://loki:3100/loki/api/v1/push"
   }
 }
 
+// ----- TEMPO -----
 otelcol.receiver.otlp "default" {
   grpc {
     endpoint = "0.0.0.0:" + sys.env("ALLOY_OTLP_GRPC_PORT")
