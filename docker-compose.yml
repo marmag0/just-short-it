@@ -8,6 +8,8 @@ services:
       args:
         SHORTENER_PORT: ${SHORTENER_PORT:?Set SHORTENER_PORT in .env}
     restart: unless-stopped
+    environment:
+      SHORTENER_PORT: ${SHORTENER_PORT:?Set SHORTENER_PORT in .env}
     ports:
       - "127.0.0.1:${SHORTENER_PORT:?Set SHORTENER_PORT in .env}:${SHORTENER_PORT:?Set SHORTENER_PORT in .env}"
     labels:
