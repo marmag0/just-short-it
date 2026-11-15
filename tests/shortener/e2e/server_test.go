@@ -53,7 +53,6 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-// TODO: main.go still hardcodes 8888, so other values work only once it reads SHORTENER_PORT.
 func port() string {
 	if p := os.Getenv("SHORTENER_PORT"); p != "" {
 		return p
@@ -73,15 +72,22 @@ type server struct {
 func startServer(t *testing.T) *server {
 	t.Helper()
 
+	cmd := exec.Command(binary)
+	cmd.Env = append(os.Environ(), "SHORTENER_PORT="+port())
+	return start(t, cmd)
+}
+
+// start runs cmd, which must make the shortener listen on port(), and waits until it accepts connections.
+func start(t *testing.T, cmd *exec.Cmd) *server {
+	t.Helper()
+
 	addr := net.JoinHostPort("localhost", port())
 	if conn, err := net.Dial("tcp", addr); err == nil {
 		conn.Close()
 		t.Fatalf("%s is already in use, stop the process listening on it or set SHORTENER_PORT", addr)
 	}
 
-	s := &server{url: "http://" + addr, done: make(chan struct{})}
-	s.cmd = exec.Command(binary)
-	s.cmd.Env = append(os.Environ(), "SHORTENER_PORT="+port())
+	s := &server{url: "http://" + addr, cmd: cmd, done: make(chan struct{})}
 	s.cmd.Stdout = &s.logs
 	s.cmd.Stderr = &s.logs
 	if err := s.cmd.Start(); err != nil {
@@ -214,5 +220,23 @@ func TestGracefulShutdown(t *testing.T) {
 				t.Fatalf("shortener did not stop within 10s after %v", sig)
 			}
 		})
+	}
+}
+
+func TestPortFromEnvFile(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, ".env"), []byte("SHORTENER_PORT="+port()+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// An empty SHORTENER_PORT counts as unset, so the port has to come from .env in the working directory.
+	cmd := exec.Command(binary)
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), "SHORTENER_PORT=")
+	s := start(t, cmd)
+
+	resp := send(t, http.MethodGet, s.url+"/"+demoLink)
+	if resp.StatusCode != http.StatusFound {
+		t.Errorf("status = %d, want %d", resp.StatusCode, http.StatusFound)
 	}
 }

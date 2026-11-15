@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -15,9 +16,16 @@ import (
 )
 
 func main() {
-	port := 8888
+	port := os.Getenv("SHORTENER_PORT")
+	if port == "" {
+		port = envFileValue(".env", "SHORTENER_PORT")
+	}
+	if port == "" {
+		slog.Error("SHORTENER_PORT is not set in the environment or .env")
+		os.Exit(1)
+	}
 	base := "cyberwav.ee"
-	addr := fmt.Sprintf("localhost:%d", port)
+	addr := fmt.Sprintf(":%s", port)
 
 	srv := &link.Server{
 		Base:  base,
@@ -55,4 +63,18 @@ func main() {
 	}
 
 	slog.Info("server stopped cleanly")
+}
+
+// envFileValue returns the value of key from a KEY=value file such as the root .env.
+func envFileValue(path, key string) string {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	for line := range strings.Lines(string(data)) {
+		if value, ok := strings.CutPrefix(strings.TrimSpace(line), key+"="); ok {
+			return value
+		}
+	}
+	return ""
 }

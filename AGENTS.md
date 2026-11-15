@@ -4,7 +4,7 @@
 
 - Project brief: a high-efficiency link shortener monorepo with no frontend, focused on telemetry and data gathering. Links are managed from a CLI over an HTTP API. Short links use custom user-defined suffixes (e.g. `/{custom_suffix}`) and temporary HTTP redirects (`307`/`302`) to ensure all clicks trigger telemetry collection. Telemetry is passive (request headers, Cloudflare geolocation headers, and Client Hints, no JavaScript) and stored in ClickHouse. `[complete here: final telemetry data points and ClickHouse schema]`
 - Privacy: client IP addresses are never stored or logged raw. `shortener` replaces them with a keyed hash (HMAC-SHA256) before a click event leaves the process.
-- Planned stack: Go for the backend services and the CLI, PostgreSQL for links and API keys, Redis for URL caching and buffering click events (Redis Streams), ClickHouse for click analytics, Grafana for visualization, dbmate for database migrations, Cloudflare with a `cloudflared` tunnel in front, and Docker with Docker Compose for orchestration on a single VPS.
+- Planned stack: Go for the backend services and the CLI, PostgreSQL for links and API keys, Redis for URL caching and buffering click events (Redis Streams), ClickHouse for click analytics, Grafana for visualization, Loki and Tempo for service logs and traces collected by Grafana Alloy, dbmate for database migrations, Cloudflare with a `cloudflared` tunnel in front, and Docker with Docker Compose for orchestration on a single VPS.
 - Development environment: VS Code on macOS, Windows, and Linux. `.gitignore` should cover generated artifacts from the stack and development environments, as well as local secret files.
 
 ## Working rules
@@ -66,7 +66,7 @@
   - `services/db/postgres/migrations/`: `dbmate` SQL migrations for links and API keys.
   - `services/db/clickhouse/migrations/`: `dbmate` SQL migrations for click events.
   - Schema snapshot generation is disabled (no `schema.sql`).
-- `grafana/`: Grafana provisioning (ClickHouse datasource and dashboards).
+- `services/grafana/`, `services/loki/`, `services/tempo/`, `services/alloy/`: Observability stack configuration, mounted read-only into the containers. `services/grafana/provisioning/` holds the ClickHouse, Loki, and Tempo datasources and dashboards. Like `services/db/`, these are not Go services and do not follow the `cmd/` and `deploy/` convention.
 - `tests/`: All automated tests, grouped by service:
   - `tests/<service>/<package>/`: Unit tests of `services/<service>/<package>/` in the external test package `<package>_test`.
   - `tests/<service>/e2e/`: End-to-end tests that build the service binary, run it, and send it HTTP requests.
@@ -76,7 +76,7 @@
   - Claude Code reads `.claude/skills/`, where each `<skill>` is a relative symlink to `.agents/skills/<skill>/`. Add a matching symlink for every new skill.
   - On Windows, the symlinks require `core.symlinks=true` in Git.
 - `docker-compose.yml`: Top-level multi-service orchestration defining:
-  - `cloudflared`: Cloudflare tunnel, the only way in from the internet (no published ports).
+  - `cloudflared`: Cloudflare tunnel, the only way in from the internet (other host ports bind to loopback only). Runs only with the `tunnel` profile.
   - `db`: PostgreSQL database.
   - `db-migrator`: `dbmate` one-shot migration runner for PostgreSQL.
   - `clickhouse`: ClickHouse database for click events.
@@ -85,6 +85,9 @@
   - `shortener`: Link shortener and redirect service (`services/shortener/deploy/Dockerfile`).
   - `telemetry`: Click event ingestion worker (`services/telemetry/deploy/Dockerfile`).
   - `grafana`: Metrics and telemetry visualization dashboards.
+  - `loki`: Log storage for container logs.
+  - `tempo`: Trace storage for OpenTelemetry traces.
+  - `alloy`: Collector that ships container logs to Loki and OTLP traces to Tempo.
   - Extension point: Additional telemetry sinks or services.
 - `go.mod`: The only Go module (`github.com/marmag0/just-short-it`), shared by all services, the CLI, and the tests.
 - `Makefile`: Monorepo task shorthand (`make dev`, `make prod`, `make down`, `make test`, `make lint`, `make format`, `make help`).

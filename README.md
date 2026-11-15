@@ -8,6 +8,12 @@ There is no frontend. Links are managed from a CLI client over an HTTP API or di
 Visitors only ever see a redirect. Everything runs on a single VPS with Docker Compose behind Cloudflare.
 
 ```mermaid
+---
+config:
+  flowchart:
+    nodeSpacing: 30
+    rankSpacing: 40
+---
 flowchart TD
     visitor[Visitor] -->|"GET /{suffix}"| cf[Cloudflare Tunnel]
     cli[CLI] -->|"HTTPS + API key"| cf
@@ -19,12 +25,26 @@ flowchart TD
             stream[(click stream)]
         end
         shortener -->|"link lookup"| cache
-        shortener -->|"links, API keys"| pg[(PostgreSQL)]
         shortener -->|"click events"| stream
+        shortener -->|"links, API keys"| pg[(PostgreSQL)]
         stream -->|"click events"| telemetry["telemetry (Go)"]
         telemetry -->|"batch insert"| ch[(ClickHouse)]
         grafana[Grafana] -->|"queries"| ch
+        shortener -->|"logs, traces"| alloy[Alloy]
+        alloy -->|"logs"| loki[(Loki)]
+        alloy -->|"traces"| tempo[(Tempo)]
+        grafana -->|"queries"| loki
+        grafana -->|"queries"| tempo
     end
+
+    classDef external fill:#f6f8fa,stroke:#8c959f,color:#1f2328
+    classDef service fill:#ddf4ff,stroke:#0969da,color:#0a3069
+    classDef storage fill:#fff8c5,stroke:#9a6700,color:#3b2300
+    class visitor,cli,cf external
+    class tunnel,shortener,telemetry,grafana,alloy service
+    class cache,stream,pg,ch,loki,tempo storage
+    style vps fill:none,stroke:#8c959f,stroke-dasharray: 5 5
+    style redis fill:none,stroke:#9a6700
 ```
 
 ## Components
@@ -39,7 +59,10 @@ flowchart TD
 | PostgreSQL        | Links and API keys, the source of truth                                                             |
 | Redis             | Link cache, click counters, and the click event stream that buffers telemetry                       |
 | ClickHouse        | Click events for analytics                                                                          |
-| Grafana           | Dashboards on top of ClickHouse                                                                     |
+| Grafana           | Dashboards on top of ClickHouse, Loki, and Tempo                                                    |
+| Loki              | Container logs of the services                                                                      |
+| Tempo             | OpenTelemetry traces of the services                                                                |
+| Alloy             | Collects container logs and OTLP traces and forwards them to Loki and Tempo                         |
 | dbmate            | Migrations for PostgreSQL and ClickHouse                                                            |
 
 ## Redirect path
@@ -67,9 +90,3 @@ Collection is passive, with no JavaScript and no interstitial page:
 - Operational: handling time and lookup source (Redis or PostgreSQL) in the same event.
 
 Client IP addresses are never stored raw. `shortener` replaces them with an HMAC-SHA256 keyed by a secret from `.env` before the event leaves the process.
-
-## Open points
-
-- Final click event schema and Grafana dashboards.
-- Merging the request retried because of `Critical-CH` with the original one into a single click.
-- ASN source: a Cloudflare Transform Rule or a local GeoLite2 database.
