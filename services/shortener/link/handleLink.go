@@ -20,7 +20,7 @@ func (s *Server) HandleLink(w http.ResponseWriter, r *http.Request) {
 	// 1. Initial short link format validation
 	ok, msg := InitialLinkValid(link)
 	if !ok {
-		slog.Error("short link not allowed", "link", fullLink, "msg", msg)
+		slog.Warn("short link not allowed", "link", fullLink, "msg", msg)
 		http.NotFound(w, r)
 		return
 	}
@@ -28,7 +28,7 @@ func (s *Server) HandleLink(w http.ResponseWriter, r *http.Request) {
 	// DEMO: checking if short link exists (in mock database)
 	var target string = s.Links[link]
 	if target == "" {
-		slog.Error("short link doesn't exist", "link", fullLink)
+		slog.Warn("short link doesn't exist", "link", fullLink)
 		http.NotFound(w, r)
 		return
 	}
