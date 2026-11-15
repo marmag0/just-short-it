@@ -90,3 +90,17 @@ Collection is passive, with no JavaScript and no interstitial page:
 - Operational: handling time and lookup source (Redis or PostgreSQL) in the same event.
 
 Client IP addresses are never stored raw. `shortener` replaces them with an HMAC-SHA256 keyed by a secret from `.env` before the event leaves the process.
+
+# Deployment
+
+Copy `.env.example` to `.env`, fill it in, and run one of:
+
+| Command       | Role                                                                   |
+| ------------- | ---------------------------------------------------------------------- |
+| `make dev`    | Checks the prerequisites and starts the stack on loopback ports        |
+| `make prod`   | Same as `make dev`, plus the `cloudflared` tunnel                      |
+| `make down`   | Stops the stack and keeps its volumes                                  |
+| `make status` | Checks that the containers run and that `shortener` and Grafana answer |
+| `make update` | Pulls the latest commit and deploys it                                 |
+
+`make status` and `make update` leave the tunnel out unless run with `ARGS=--tunnel`.

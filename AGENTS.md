@@ -32,7 +32,7 @@
     - Add a blank line immediately after `-- migrate:up` and `-- migrate:down`.
     - Group distinct logical blocks with a single blank line (e.g. between `DO $$ ... $$;` blocks, `GRANT` statements, and `ALTER DEFAULT PRIVILEGES`).
     - Separate the end of the `migrate:up` section from the `-- migrate:down` header with two blank lines.
-  - Shell scripts (`services/db/postgres/init/`):
+  - Shell scripts (`scripts/`, `services/db/postgres/init/`):
     - Use POSIX shell (`#!/bin/sh`) with `set -e`.
     - Place a single blank line after the shebang and after `set -e`.
     - Keep scripts concise, minimal, and idiomatic without wrapper bloat.
@@ -70,7 +70,7 @@
 - `tests/`: All automated tests, grouped by service:
   - `tests/<service>/<package>/`: Unit tests of `services/<service>/<package>/` in the external test package `<package>_test`.
   - `tests/<service>/e2e/`: End-to-end tests that build the service binary, run it, and send it HTTP requests.
-  - `tests/stack/`: Tests of `docker-compose.yml` (ports come from `.env`), the Loki, Tempo, and Alloy configurations, the `shortener` image, and the whole running stack. They need Docker and are skipped without it.
+  - `tests/stack/`: Tests of `docker-compose.yml` (ports come from `.env`), the Loki, Tempo, and Alloy configurations, the `shortener` image, `scripts/prerequisites.sh`, and the whole running stack. They need Docker and are skipped without it.
   - Tests reach only exported names of non-`main` packages, so testable logic lives outside `cmd/`.
 - `.agents/skills/`: Agent skills shared by Codex and Claude Code, one directory per skill (`<skill>/SKILL.md`):
   - Codex reads `.agents/skills/` directly. This is the only place to edit skills.
@@ -91,7 +91,13 @@
   - `alloy`: Collector that ships container logs to Loki and OTLP traces to Tempo.
   - Extension point: Additional telemetry sinks or services.
 - `go.mod`: The only Go module (`github.com/marmag0/just-short-it`), shared by all services, the CLI, and the tests.
-- `Makefile`: Monorepo task shorthand (`make dev`, `make prod`, `make down`, `make test`, `make lint`, `make format`, `make help`).
+- `scripts/`: Deployment helpers. They log with `[*]` (step), `[+]` (ok), `[!]` (error), and `[i]` (recommendation), and end with a red, yellow, or green summary line. `--tunnel` adds the `tunnel` profile:
+  - `common.sh`: Log helpers, flag handling, and `.env` lookup, sourced by the other scripts.
+  - `prerequisites.sh`: Checks the dependencies and `.env` (ports, placeholders left from `.env.example`). With `--tunnel`, an empty or placeholder secret is an error.
+  - `deploy.sh`: Runs `prerequisites.sh`, `docker compose up`, and `status.sh`.
+  - `status.sh`: Checks that the containers run and that `shortener` and Grafana answer.
+  - `update.sh`: Runs `git pull --ff-only` and `deploy.sh`.
+- `Makefile`: Monorepo task shorthand (`make dev`, `make prod`, `make down`, `make status`, `make update`, `make test`, `make lint`, `make format`, `make help`).
 - `.env`: Local environment values (ignored by Git). `.env.example`: Tracked template with variable placeholders.
 - `README.md`: Top-level project documentation.
 
@@ -102,7 +108,7 @@
 - For ignore-rule changes, check representative ignored and tracked paths with `git check-ignore`.
 - For Go changes, run `gofmt -l .`, `go vet ./...`, and `go test ./...` from the repository root. `gofmt -l` must print nothing. Apply fixes with `gofmt -w .`. `go test -short ./...` skips the slow whole-stack test.
 - To measure coverage of `services/`, including the e2e binaries built with `-cover`, run `go test -short -cover -coverpkg=./services/... ./tests/... -args -test.gocoverdir=<dir>`, then `GOCOVERDIR=<dir> go test -count=1 ./tests/shortener/e2e/`, and read the total with `go tool covdata percent -i=<dir>`. `<dir>` must be an existing absolute path outside the repository, because tests run in other working directories.
-- For shell script changes in `services/db/postgres/init/`, run `sh -n services/db/postgres/init/*.sh`.
+- For shell script changes, run `sh -n scripts/*.sh` or `sh -n services/db/postgres/init/*.sh`.
 - For code or Docker changes, run the relevant configured formatting, build, test, and configuration checks across affected services. Add or update regression tests in `tests/` when behavior changes warrant them.
 
 ## Secrets and local files
