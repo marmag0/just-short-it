@@ -56,17 +56,20 @@ for key in $(sed -n 's/^\([A-Z_]*\)=.*/\1/p' .env.example); do
 		esac
 		ports="$ports $value"
 		;;
-	*)
-		report=info
-		case $key in
-		*_PASSWORD | *_TOKEN) report=$secret ;;
-		esac
+	*_PASSWORD | *_TOKEN)
 		if [ -z "$value" ]; then
-			$report "$key is empty"
+			$secret "$key is empty"
 		elif [ "$value" = "$(env_value .env.example "$key")" ]; then
-			$report "$key still has the placeholder from .env.example"
+			$secret "$key still has the placeholder from .env.example"
 		else
 			ok "$key is set"
+		fi
+		;;
+	*)
+		if [ -n "$value" ]; then
+			ok "$key is set"
+		else
+			info "$key is empty"
 		fi
 		;;
 	esac
@@ -82,4 +85,4 @@ if [ "$errors" -eq 0 ]; then
 	fi
 fi
 
-summary
+summary "prerequisites check"

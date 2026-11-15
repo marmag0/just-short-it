@@ -48,6 +48,37 @@ func prerequisites(t *testing.T, env map[string]string, args ...string) (string,
 	return string(out), 0
 }
 
+func TestMakeFlags(t *testing.T) {
+	if _, err := exec.LookPath("make"); err != nil {
+		t.Skipf("make is not available: %v", err)
+	}
+
+	tests := []struct {
+		args []string
+		want string
+	}{
+		{[]string{"down"}, "docker compose --profile tunnel down"},
+		{[]string{"down", "VOLUME=1"}, "docker compose --profile tunnel down --volumes"},
+		{[]string{"down", "VOLUME=0"}, "docker compose --profile tunnel down"},
+		{[]string{"status"}, "scripts/status.sh"},
+		{[]string{"status", "TUNNEL=1"}, "scripts/status.sh --tunnel"},
+		{[]string{"update"}, "scripts/update.sh"},
+		{[]string{"update", "TUNNEL=1"}, "scripts/update.sh --tunnel"},
+		{[]string{"update", "TUNNEL=0"}, "scripts/update.sh"},
+	}
+
+	for _, tt := range tests {
+		t.Run(strings.Join(tt.args, " "), func(t *testing.T) {
+			// A dry run prints the command without running it.
+			cmd := exec.Command("make", append([]string{"--dry-run"}, tt.args...)...)
+			cmd.Dir = root
+			if got := strings.TrimSpace(string(run(t, cmd))); got != tt.want {
+				t.Errorf("make %s runs %q, want %q", strings.Join(tt.args, " "), got, tt.want)
+			}
+		})
+	}
+}
+
 func TestPrerequisites(t *testing.T) {
 	requireDocker(t)
 
@@ -55,7 +86,6 @@ func TestPrerequisites(t *testing.T) {
 	// filled is a .env with every placeholder of .env.example replaced.
 	filled := func(change func(env map[string]string)) map[string]string {
 		env := exampleEnv(t)
-		env["GRAFANA_ADMIN_USER"] = "someone"
 		env["GRAFANA_ADMIN_PASSWORD"] = "prerequisites-test-password"
 		env["CLOUDFLARE_TUNNEL_TOKEN"] = "prerequisites-test-token"
 		if change != nil {
@@ -70,10 +100,10 @@ func TestPrerequisites(t *testing.T) {
 		args  []string
 		code  int
 		color string
-		want  string
+		want  string // in the summary
 	}{
-		{"filled in", filled(nil), nil, 0, green, "[+] GRAFANA_ADMIN_PASSWORD is set"},
-		{"filled in with tunnel", filled(nil), []string{"--tunnel"}, 0, green, "[+] CLOUDFLARE_TUNNEL_TOKEN is set"},
+		{"filled in", filled(nil), nil, 0, green, "[+] prerequisites check successful"},
+		{"filled in with tunnel", filled(nil), []string{"--tunnel"}, 0, green, "[+] prerequisites check successful"},
 		{"placeholders", exampleEnv(t), nil, 0, yellow, "[i] GRAFANA_ADMIN_PASSWORD still has the placeholder from .env.example"},
 		{"placeholders with tunnel", exampleEnv(t), []string{"--tunnel"}, 1, red, "[!] GRAFANA_ADMIN_PASSWORD still has the placeholder from .env.example"},
 		{"no token with tunnel", filled(func(env map[string]string) { env["CLOUDFLARE_TUNNEL_TOKEN"] = "" }), []string{"--tunnel"}, 1, red, "[!] CLOUDFLARE_TUNNEL_TOKEN is empty"},
@@ -90,12 +120,15 @@ func TestPrerequisites(t *testing.T) {
 			if code != tt.code {
 				t.Errorf("exit code = %d, want %d", code, tt.code)
 			}
-			if !strings.Contains(out, tt.want) {
-				t.Errorf("output does not contain %q", tt.want)
+			_, summary, ok := strings.Cut(out, tt.color)
+			if !ok {
+				t.Errorf("output has no summary in the color %q", tt.color)
 			}
-			lines := strings.Split(strings.TrimSpace(out), "\n")
-			if last := lines[len(lines)-1]; !strings.HasPrefix(last, tt.color) {
-				t.Errorf("last line = %q, want it to start with %q", last, tt.color)
+			if !strings.Contains(summary, tt.want) {
+				t.Errorf("summary = %q, want it to contain %q", summary, tt.want)
+			}
+			if strings.Contains(out, "GRAFANA_ADMIN_USER still has the placeholder") {
+				t.Error("the user name from .env.example is reported as a placeholder")
 			}
 			if t.Failed() {
 				t.Logf("output:\n%s", out)

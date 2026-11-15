@@ -2,27 +2,34 @@
 
 errors=0
 hints=0
+findings=
 
 step() { printf '[*] %s\n' "$1"; }
 ok() { printf '[+] %s\n' "$1"; }
 err() {
-	printf '[!] %s\n' "$1"
 	errors=$((errors + 1))
+	finding "[!] $1"
 }
 info() {
-	printf '[i] %s\n' "$1"
 	hints=$((hints + 1))
+	finding "[i] $1"
 }
 
-# summary prints the colored last line and fails when there were errors.
+# finding prints a line and keeps it for the summary.
+finding() {
+	printf '%s\n' "$1"
+	findings=$(printf '%s\n    %s' "$findings" "$1")
+}
+
+# summary prints the colored result of task $1, lists the findings, and fails when there were errors.
 summary() {
 	if [ "$errors" -gt 0 ]; then
-		printf '\033[31m[!] %s error(s), %s recommendation(s)\033[0m\n' "$errors" "$hints"
+		printf '\033[31m[!] %s error(s), %s recommendation(s):%s\033[0m\n' "$errors" "$hints" "$findings"
 		return 1
 	elif [ "$hints" -gt 0 ]; then
-		printf '\033[33m[i] no errors, %s recommendation(s)\033[0m\n' "$hints"
+		printf '\033[33m[i] no errors, %s recommendation(s):%s\033[0m\n' "$hints" "$findings"
 	else
-		printf '\033[32m[+] all good\033[0m\n'
+		printf '\033[32m[+] %s successful\033[0m\n' "$1"
 	fi
 }
 

@@ -100,6 +100,7 @@ type service struct {
 		Published string
 	}
 	Environment map[string]string
+	Command     []string
 	Build       *struct {
 		Args map[string]string
 	}
@@ -140,7 +141,7 @@ func TestComposePortsFromEnv(t *testing.T) {
 				t.Errorf("%s publishes %s on %q, want 127.0.0.1", name, key, p.HostIP)
 			case strconv.Itoa(p.Target) != p.Published:
 				t.Errorf("%s maps %s to container port %d, want the same port inside the container", name, key, p.Target)
-			case !slices.Contains(slices.Collect(maps.Values(s.Environment)), p.Published):
+			case !slices.Contains(slices.Collect(maps.Values(s.Environment)), p.Published) && !slices.ContainsFunc(s.Command, func(arg string) bool { return strings.HasSuffix(arg, ":"+p.Published) }):
 				t.Errorf("%s does not pass %s to its container, so it cannot listen on it", name, key)
 			case s.Build != nil && !slices.Contains(slices.Collect(maps.Values(s.Build.Args)), p.Published):
 				t.Errorf("%s does not pass %s to its image build, so the image cannot expose it", name, key)

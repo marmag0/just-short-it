@@ -5,4 +5,4 @@ set -e
 cd "$(dirname "$0")/.."
 
 git pull --ff-only
-scripts/deploy.sh "$@"
+TASK="update and deployment" scripts/deploy.sh "$@"

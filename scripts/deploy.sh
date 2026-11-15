@@ -7,4 +7,4 @@ cd "$(dirname "$0")/.."
 
 scripts/prerequisites.sh "$@"
 docker compose $profile up --detach --build
-scripts/status.sh "$@"
+TASK="${TASK:-deployment}" scripts/status.sh "$@"

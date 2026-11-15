@@ -1,5 +1,7 @@
 .PHONY: help dev prod down status update test lint format
 
+tunnel = $(if $(filter 1,$(TUNNEL)),--tunnel)
+
 help: ## Show this list of shortcuts
 	@awk 'BEGIN {FS = ":.*## "} /^## / {print substr($$0, 4)} /^[a-z-]+:.*## / {printf "make %-8s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
@@ -11,16 +13,16 @@ dev: ## Check prerequisites and start the local stack
 prod: ## Same as dev, plus the Cloudflare tunnel
 	@scripts/deploy.sh --tunnel
 
-down: ## Stop the stack, volumes are kept
-	docker compose --profile tunnel down
+down: ## Stop the stack; VOLUME=1 also removes its volumes
+	docker compose --profile tunnel down $(if $(filter 1,$(VOLUME)),--volumes)
 
 ## ----------------------------------------
 
-status: ## Check that the containers run and answer; ARGS=--tunnel includes the Cloudflare tunnel
-	@scripts/status.sh $(ARGS)
+status: ## Check that the containers run and answer; TUNNEL=1 includes the Cloudflare tunnel
+	@scripts/status.sh $(tunnel)
 
-update: ## Pull the latest commit and deploy it; ARGS=--tunnel includes the Cloudflare tunnel
-	@scripts/update.sh $(ARGS)
+update: ## Pull the latest commit and deploy it; TUNNEL=1 includes the Cloudflare tunnel
+	@scripts/update.sh $(tunnel)
 
 ## ----------------------------------------
 

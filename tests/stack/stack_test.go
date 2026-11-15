@@ -116,6 +116,11 @@ func TestStack(t *testing.T) {
 		return err
 	})
 
+	eventually(t, "Alloy UI", func() error {
+		_, err := body(http.Get(local("ALLOY_UI_PORT") + "/-/ready"))
+		return err
+	})
+
 	now := time.Now().UnixNano()
 	traceID := fmt.Sprintf("%032x", now)
 	trace := fmt.Sprintf(`{"resourceSpans":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"stack-test"}}]},`+

@@ -91,6 +91,8 @@ Collection is passive, with no JavaScript and no interstitial page:
 
 Client IP addresses are never stored raw. `shortener` replaces them with an HMAC-SHA256 keyed by a secret from `.env` before the event leaves the process.
 
+Logs and traces are retained for `28 days`.
+
 # Deployment
 
 Copy `.env.example` to `.env`, fill it in, and run one of:
@@ -99,8 +101,8 @@ Copy `.env.example` to `.env`, fill it in, and run one of:
 | ------------- | ---------------------------------------------------------------------- |
 | `make dev`    | Checks the prerequisites and starts the stack on loopback ports        |
 | `make prod`   | Same as `make dev`, plus the `cloudflared` tunnel                      |
-| `make down`   | Stops the stack and keeps its volumes                                  |
+| `make down`   | Stops the stack, `VOLUME=1` also removes its volumes                   |
 | `make status` | Checks that the containers run and that `shortener` and Grafana answer |
 | `make update` | Pulls the latest commit and deploys it                                 |
 
-`make status` and `make update` leave the tunnel out unless run with `ARGS=--tunnel`.
+`make status` and `make update` leave the tunnel out unless run with `TUNNEL=1`.

@@ -91,9 +91,9 @@
   - `alloy`: Collector that ships container logs to Loki and OTLP traces to Tempo.
   - Extension point: Additional telemetry sinks or services.
 - `go.mod`: The only Go module (`github.com/marmag0/just-short-it`), shared by all services, the CLI, and the tests.
-- `scripts/`: Deployment helpers. They log with `[*]` (step), `[+]` (ok), `[!]` (error), and `[i]` (recommendation), and end with a red, yellow, or green summary line. `--tunnel` adds the `tunnel` profile:
+- `scripts/`: Deployment helpers. They log with `[*]` (step), `[+]` (ok), `[!]` (error), and `[i]` (recommendation), and end with a red, yellow, or green summary that lists the errors and recommendations. `--tunnel` adds the `tunnel` profile:
   - `common.sh`: Log helpers, flag handling, and `.env` lookup, sourced by the other scripts.
-  - `prerequisites.sh`: Checks the dependencies and `.env` (ports, placeholders left from `.env.example`). With `--tunnel`, an empty or placeholder secret is an error.
+  - `prerequisites.sh`: Checks the dependencies and `.env` (ports, empty values, secrets left as placeholders from `.env.example`). With `--tunnel`, an empty or placeholder secret is an error.
   - `deploy.sh`: Runs `prerequisites.sh`, `docker compose up`, and `status.sh`.
   - `status.sh`: Checks that the containers run and that `shortener` and Grafana answer.
   - `update.sh`: Runs `git pull --ff-only` and `deploy.sh`.

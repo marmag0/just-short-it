@@ -34,4 +34,5 @@ if [ "$errors" -eq 0 ]; then
 	fi
 fi
 
-summary
+# deploy.sh and update.sh name the task that this check concludes.
+summary "${TASK:-status check}"
