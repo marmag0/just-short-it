@@ -14,7 +14,7 @@ prod: ## Same as dev, plus the Cloudflare tunnel
 	@scripts/deploy.sh --tunnel
 
 down: ## Stop the stack; VOLUME=1 also removes its volumes
-	docker compose --profile tunnel down $(if $(filter 1,$(VOLUME)),--volumes)
+	@scripts/down.sh $(if $(filter 1,$(VOLUME)),--volumes)
 
 ## ----------------------------------------
 

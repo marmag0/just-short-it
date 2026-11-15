@@ -4,6 +4,7 @@ set -e
 
 cd "$(dirname "$0")/.."
 . scripts/common.sh
+tunnel_flag "$@"
 
 step "Dependencies"
 if ! command -v docker >/dev/null; then

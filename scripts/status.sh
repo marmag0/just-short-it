@@ -4,6 +4,7 @@ set -e
 
 cd "$(dirname "$0")/.."
 . scripts/common.sh
+tunnel_flag "$@"
 
 step "Containers"
 for service in $(docker compose $profile config --services); do

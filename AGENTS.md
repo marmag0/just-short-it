@@ -70,7 +70,7 @@
 - `tests/`: All automated tests, grouped by service:
   - `tests/<service>/<package>/`: Unit tests of `services/<service>/<package>/` in the external test package `<package>_test`.
   - `tests/<service>/e2e/`: End-to-end tests that build the service binary, run it, and send it HTTP requests.
-  - `tests/stack/`: Tests of `docker-compose.yml` (ports come from `.env`), the Loki, Tempo, and Alloy configurations, the `shortener` image, `scripts/prerequisites.sh`, and the whole running stack. They need Docker and are skipped without it.
+  - `tests/stack/`: Tests of `docker-compose.yml` (ports come from `.env`), the Loki, Tempo, and Alloy configurations, the `shortener` image, the `scripts/` and `Makefile` flags, and the whole running stack. They need Docker and are skipped without it.
   - Tests reach only exported names of non-`main` packages, so testable logic lives outside `cmd/`.
 - `.agents/skills/`: Agent skills shared by Codex and Claude Code, one directory per skill (`<skill>/SKILL.md`):
   - Codex reads `.agents/skills/` directly. This is the only place to edit skills.
@@ -97,6 +97,7 @@
   - `deploy.sh`: Runs `prerequisites.sh`, `docker compose up`, and `status.sh`.
   - `status.sh`: Checks that the containers run and that `shortener` and Grafana answer.
   - `update.sh`: Runs `git pull --ff-only` and `deploy.sh`.
+  - `down.sh`: Stops the stack, including the tunnel. `--volumes` also removes its volumes.
 - `Makefile`: Monorepo task shorthand (`make dev`, `make prod`, `make down`, `make status`, `make update`, `make test`, `make lint`, `make format`, `make help`).
 - `.env`: Local environment values (ignored by Git). `.env.example`: Tracked template with variable placeholders.
 - `README.md`: Top-level project documentation.

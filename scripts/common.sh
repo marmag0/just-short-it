@@ -36,12 +36,14 @@ summary() {
 # env_value prints the value of key $2 from the KEY=value file $1.
 env_value() { sed -n "s/^$2=//p" "$1" | tail -n 1; }
 
-# --tunnel adds cloudflared, the way in from the internet.
-case ${1:-} in
-'') profile= ;;
---tunnel) profile="--profile tunnel" ;;
-*)
-	echo "usage: $0 [--tunnel]" >&2
-	exit 2
-	;;
-esac
+# tunnel_flag reads the optional --tunnel flag, which adds cloudflared, the way in from the internet.
+tunnel_flag() {
+	case ${1:-} in
+	'') profile= ;;
+	--tunnel) profile="--profile tunnel" ;;
+	*)
+		echo "usage: $0 [--tunnel]" >&2
+		exit 2
+		;;
+	esac
+}
